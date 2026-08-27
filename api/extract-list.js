@@ -16,12 +16,36 @@ function extractProducts(html){
   for(const b of blocks){
     const title=first(b,/class="poly-component__title"[^>]*>([^<]+)</)||first(b,/class="ui-search-item__title"[^>]*>([^<]+)</);
     let link=first(b,/class="poly-component__title"[^>]*href="([^"]+)"/)||first(b,/href="([^"]+)"[^>]*class="poly-component__title"/)||first(b,/class="ui-search-link"[^>]*href="([^"]+)"/)||first(b,/<a[^>]*href="(https:\/\/[^\"]*mercadolivre\.com\.br[^\"]*)"/);
-    const fraction=first(b,/class="andes-money-amount__fraction"[^>]*>([\d.,]+)</), cents=first(b,/class="andes-money-amount__cents"[^>]*>(\d+)</);
+    const price=extractPrice(b);
     if(!title||!link) continue; link=decode(link); const key=link.split('#')[0]; if(seen.has(key))continue; seen.add(key);
-    let price=fraction?fraction.replace(/\./g,'').replace(',',''):''; if(price&&cents)price+='.'+cents;
     let image=extractImage(b); if(image)image=decode(image).replace(/-[A-Z]\.(jpg|jpeg|png|webp)/i,'-F.$1');
     out.push({nome:clean(title),preco:price,linkProduto:link.startsWith('http')?link:`https://www.mercadolivre.com.br${link}`,linkImagem:image||''});
   } return out;
+}
+function extractPrice(block){
+  const fraction=first(block,/class=["'][^"']*andes-money-amount__fraction[^"']*["'][^>]*>([\d.,]+)/i);
+  const cents=first(block,/class=["'][^"']*andes-money-amount__cents[^"']*["'][^>]*>(\d+)/i);
+  if(fraction){
+    let value=fraction.replace(/\./g,'').replace(',','.');
+    if(cents&&!value.includes('.'))value+='.'+cents.padEnd(2,'0').slice(0,2);
+    return normalizePrice(value);
+  }
+  const candidates=[
+    first(block,/itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i),
+    first(block,/content=["']([\d.,]+)["'][^>]*itemprop=["']price["']/i),
+    first(block,/["']price["']\s*:\s*([0-9]+(?:\.[0-9]+)?)/i),
+    first(block,/["']amount["']\s*:\s*([0-9]+(?:\.[0-9]+)?)/i),
+    first(block,/aria-label=["'][^"']*R\$\s*([\d.,]+)/i)
+  ];
+  for(const value of candidates){const price=normalizePrice(value);if(price)return price;}
+  return '';
+}
+function normalizePrice(value){
+  let s=String(value||'').replace(/[^0-9.,]/g,'');
+  if(!s)return '';
+  if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+  else if(s.includes(','))s=s.replace(',','.');
+  const n=Number(s);return Number.isFinite(n)&&n>0?n.toFixed(2):'';
 }
 function split(html,re){const marks=[];let m;while((m=re.exec(html))!==null)marks.push(m.index);return marks.map((x,i)=>html.slice(x,marks[i+1]??Math.min(x+9000,html.length)));}
 function extractImage(block){
