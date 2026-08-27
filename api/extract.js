@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 }
 function cors(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');}
 function browserHeaders(){return {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept-Language':'pt-BR,pt;q=0.9','Accept':'text/html,application/xhtml+xml'};}
-function isAllowedUrl(value){try{const u=new URL(value);return u.protocol==='https:' && /(^|\.)mercadolivre\.com\.br$/i.test(u.hostname);}catch{return false;}}
+function isAllowedUrl(value){try{const u=new URL(value);return u.protocol==='https:' && (/(^|\.)mercadolivre\.com\.br$/i.test(u.hostname) || u.hostname.toLowerCase()==='meli.la');}catch{return false;}}
 function meta(html,key,value){const esc=value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');for(const re of [new RegExp(`<meta[^>]+${key}=["']${esc}["'][^>]+content=["']([^"']+)["']`,'i'),new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${esc}["']`,'i')]){const m=html.match(re);if(m)return m[1];}return '';}
 function tag(html,name){return html.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`,'i'))?.[1] || '';}
 function clean(t=''){return t.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();}
