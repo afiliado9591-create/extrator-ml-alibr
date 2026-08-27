@@ -24,7 +24,21 @@ function extractProducts(html){
   } return out;
 }
 function split(html,re){const marks=[];let m;while((m=re.exec(html))!==null)marks.push(m.index);return marks.map((x,i)=>html.slice(x,marks[i+1]??Math.min(x+9000,html.length)));}
-function extractImage(b){const m=b.match(/https:\/\/[^"'\s)]+\.mlstatic\.com\/[^"'\s)]+/g);if(!m)return '';return (m.find(u=>/D_(NQ|Q)_(NP_)?\d/.test(u))||m[0]).split(',')[0].trim();}
+function extractImage(block){
+  // As páginas do ML podem entregar URLs normais, com barras escapadas,
+  // entidades HTML ou sequências unicode dentro de JSON.
+  const normalized=block
+    .replace(/\\u002[fF]/g,'/')
+    .replace(/\\\//g,'/')
+    .replace(/&quot;|&#34;/g,'"')
+    .replace(/&amp;/g,'&');
+  const matches=normalized.match(/https?:\/\/[^"'\\s<>),]+\.mlstatic\.com\/[^"'\\s<>),]+/gi);
+  if(!matches||!matches.length)return '';
+  const valid=matches
+    .map(u=>u.replace(/[?&](?:amp;)?$/,'').trim())
+    .filter(u=>!/1X1|pixel|sprite|logo/i.test(u));
+  return valid.find(u=>/D_(?:NQ|Q)_(?:NP_)?(?:2X_)?\d/i.test(u))||valid[0]||'';
+}
 function first(s,re){return s.match(re)?.[1]||'';} function decode(s){return s.replace(/&amp;/g,'&');}
 function clean(s=''){return decode(s).replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();}
 function cors(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');}
