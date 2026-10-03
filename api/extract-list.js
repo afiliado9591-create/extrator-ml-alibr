@@ -7,8 +7,25 @@ export default async function handler(req, res) {
     const response = await fetch(url,{redirect:'follow',headers:browserHeaders()});
     if(!response.ok) return res.status(200).json({originalUrl:url,error:`Não foi possível acessar o link (status ${response.status})`,products:[]});
     const html=await response.text(); const products=extractProducts(html);
+    // Página de UM produto (sem cards de listagem): lê nome, preço e imagem da própria página
+    if(!products.length){ const one=extractSingle(html,response.url); if(one) products.push(one); }
     return res.status(200).json({originalUrl:url,finalUrl:response.url,total:products.length,products});
   } catch(err){return res.status(200).json({originalUrl:url,error:err.message,products:[]});}
+}
+function extractSingle(html,finalUrl){
+  const meta=(prop)=>first(html,new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`,'i'))||first(html,new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`,'i'));
+  let title=meta('og:title')||first(html,/<h1[^>]*class="[^"]*ui-pdp-title[^"]*"[^>]*>([^<]+)</i);
+  if(!title) return null;
+  title=clean(title).replace(/\s*[|\-–]\s*Mercado\s?Livre.*$/i,'').trim();
+  let image=meta('og:image');
+  image=image?decode(image):extractImage(html);
+  if(image) image=image.replace(/-[A-Z]\.(jpg|jpeg|png|webp)/i,'-F.$1');
+  const price=normalizePrice(
+    first(html,/itemprop=["']price["'][^>]*content=["']([\d.,]+)["']/i)||
+    first(html,/content=["']([\d.,]+)["'][^>]*itemprop=["']price["']/i)||
+    first(html,/["']price["']\s*:\s*([0-9]+(?:\.[0-9]+)?)/i)
+  )||extractPrice(html);
+  return {nome:title,preco:price,linkProduto:finalUrl||'',linkImagem:image||''};
 }
 function extractProducts(html){
   let blocks=split(html,/<div class="poly-card[^"]*"/g); if(!blocks.length) blocks=split(html,/<li class="ui-search-layout__item[^"]*"/g);
@@ -67,4 +84,4 @@ function first(s,re){return s.match(re)?.[1]||'';} function decode(s){return s.r
 function clean(s=''){return decode(s).replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();}
 function cors(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');}
 function browserHeaders(){return {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept-Language':'pt-BR,pt;q=0.9','Accept':'text/html,application/xhtml+xml'};}
-function isAllowedUrl(value){try{const u=new URL(value);return u.protocol==='https:' && (/(^|\.)mercadolivre\.com\.br$/i.test(u.hostname) || u.hostname.toLowerCase()==='meli.la');}catch{return false;}}
+function isAllowedUrl(value){try{const u=new URL(value);return u.protocol==='https:' && (/(^|\.)mercadolivre\.com(\.br)?$/i.test(u.hostname) || u.hostname.toLowerCase()==='meli.la');}catch{return false;}}
